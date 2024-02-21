@@ -1,85 +1,61 @@
-# Packages
-import tensorflow as tf
+import numpy as np
+from gds.optimizers import *
+from loss_functions.d7 import *
 
-# Modules
-from gds.opt_adam import gradient_descent_step
-from loss_functions.d7_loss import loss_function
+
+# Options
+file_path = "/home/sixten/Projects/GDS_saves/"
+search_length = 3  # Number of minimas to look for
 
 # Search paramters
 tol = 1e-9
-learning_rate = 1e-1
-search_length = 1 # Number of minimas to look for
+initial_learning_rate = 2e-1
+decay_steps = 1250
+decay_rate = 0.6
 
 # Operationl paramters
-bad_minima = False
-stationary = False
-counter = 0
+good_minima = False
+max_steps = 3000
+theory = d7()
+# processor = Adam(initial_learning_rate, theory.loss_func, *theory.inputs())
+processor = GD_op(
+    initial_learning_rate,
+    theory.loss_func,
+    *theory.inputs(),
+    decay_steps=decay_steps,
+    decay_rate=decay_rate,
+)
 
-optimizer = tf.optimizers.Adam(learning_rate=learning_rate, epsilon=tol)
-y = tf.Variable(tf.random.uniform((25,)), dtype=tf.float32)
-z = tf.Variable(tf.random.uniform((50,)), dtype=tf.float32)
+step = None
+norm = None
+minima = []
+for _ in range(search_length):
+    for step in range(max_steps):
+        gradients = processor.gds()
+        if step % 10 == 0:
+            norm = processor.norm(gradients)
+            if norm < tol:
+                print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                print("Minimum found!")
+                print(f"Steps: {step}")
+                print(f"Total norm: {norm}")
+                print("######################################")
+                file_name = "test_file.txt"
+                minima.append((step, *processor.optimizer.variables()))
+                break
+        if step % 250 == 0:
+            norm = processor.norm(gradients)
+            print(f"Steps: {step}")
+            print(f"Total norm:{norm}")
+            print("######################################")
+    if good_minima == False:
+        print("Solution abandoned")
+        print(f"Steps: {step}")
+        print(f"Total norm: {norm}")
+        print("######################################")
+        file_name = "test_file.txt"
+        minima.append((step, *processor.optimizer.variables()))
 
-def stationarity(gradients, tol=1e-5):
-	"""
-	Computes the norm of the gradients with tensorflow tools.
-
-	Args:
-		gradients - list of gradients.
-		tol = tolerance lever.
-
-	Returns:
-		True or False - True corresponds to having found a minimum
-	"""
-
-	# Cheat norm
-	# gradient_norm = min([tf.norm(grad) for grad in gradients if grad is not None])
-
-	# Not cheat norm
-	gradient_norm = tf.norm(gradients[0]) + tf.norm(gradients[1])
-	if gradient_norm < tol:
-		return True
-	else:
-		return False
-
-for i in range(search_length):
-	y.assign(tf.random.uniform((25,), dtype=tf.float32))
-	z.assign(tf.random.uniform((50,), dtype=tf.float32))
-
-	while stationary == False:
-		# Perform a gradient descent step
-		gradients, loss_val = gradient_descent_step(loss_function, y, z)
-		counter += 1
-		if counter % 10 == 0:
-			stationary = stationarity(gradients, tol=tol)
-			if counter % 2000 == 0:
-				print(f"Solution abandoned")
-				# print(f"Time spent {ti-tf_2000}")
-				# print(f"Updated y: {Y(y).numpy()}")
-				# print(f"Updated z: {Z(z).numpy()}")
-				# print(f"Loss : {loss_val.numpy()}")
-				# print(f"Grad^2 y:{tf.norm(gradients[0]).numpy()}")
-				# print(f"Grad^2 z:{tf.norm(gradients[1]).numpy()}")
-				# print(
-				# f"Total gradient^2 :{tf.norm(gradients[0])+tf.norm(gradients[1])}"
-				# )
-				# x = np.einsum("QMNP,QMNP->", X(y, z), X(y, z))
-				# print(f"Updated x: {x}")
-				print("######################################")
-				# bad_minima = True
-				break
-
-	if bad_minima == False:
-		print("Minimum found!")
-		print(f"norm grad y:{tf.norm(gradients[0]).numpy()}")
-		print(f"norm grad z:{tf.norm(gradients[1]).numpy()}")
-		print(f"norm y:{tf.norm(Y(y)).numpy()}")
-		print(f"norm z:{tf.norm(Z(z)).numpy()}")
-		print(f"Updated y: {Y(y).numpy()}")
-		print(f"Signature of Y: {eigen_formater(Y(y))}")
-		# print(f"Updated z: {Z(z).numpy()}")
-		print(f"Loss: {loss_val.numpy()}")
-		x = np.einsum("QMNP,QMNP->", X(y, z), X(y, z))
-		print(f"Updated x: {x}")
-		print(f"Steps : {counter}")
-		print("######################################")
-	bad_minima = False
+    good_minima = False
+    processor.reset()
+np.savez(file_path + file_name, minima)
