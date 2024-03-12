@@ -69,17 +69,15 @@ class GD_op:
 
 
 class Adam:
-    def __init__(self, learning_rate, loss_func, *inputs):
+    def __init__(self, learning_rate, loss_func, input_dims, tol=1e-9):
         self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
-        self.input_dims = inputs
-        self.inputs = [
-            tf.Variable(tf.random.uniform((dim,)), dtype=tf.float32) for dim in inputs
-        ]
-        self.loss_func = tf.function(loss_func)
+        self.input_dims = input_dims
+        self.tol = tol
+        self.loss_func = loss_func
 
-    def reset(self):
-        for input in self.inputs:
-            input.assign(tf.random.uniform((input.shape[0],), dtype=tf.float32))
+    @tf.function
+    def loss_wrapper(self, bar):
+        return self.loss_func(bar[:25], bar[25:])
 
     @tf.function
     def gds(self):
@@ -93,19 +91,30 @@ class Adam:
         Returns:
                 gradients - Numerical gradient.
                 loss - Returns value of loss function, important that this is a tensor
-                        and not a function, otherwise tensorflow will not
+                        and not a function, otherwise Tensorflow will not
                         compile the function.
         """
         with tf.GradientTape() as tape:
-            tape.watch(list(self.inputs))
-            loss = self.loss_func(*self.inputs)
-        gradients = tape.gradient(loss, list(self.inputs))
-        self.optimizer.apply_gradients(zip(gradients, list(self.inputs)))
+            tape.watch(list(self.x))
+            loss = self.loss_wrapper(self.x)
+        gradients = tape.gradient(loss, list(self.x))
+        self.optimizer.apply_gradients(zip(gradients, list(self.x)))
         return gradients
 
     @tf.function
     def norm(self, gradients):
-        return tf.linalg.norm(tf.concat([*gradients], axis=0))
+        return tf.linalg.norm(tf.concat(list(*gradients), axis=0))
+
+    # @tf.function
+    def search(self, x, maxiter=1e4):
+        self.x = tf.Variable(x)
+        for iter in range(int(maxiter)):
+            gradients = self.gds()
+            print(self.norm(gradients))
+            if self.norm(gradients) < self.tol:
+                return x
+            elif iter > maxiter:
+                print("Ran out of range, stops")
 
 
 class BFGS:

@@ -4,7 +4,6 @@ from gds.optimizers import *
 from loss_functions.d7 import *
 from datetime import datetime
 
-# Here is a new comment
 
 # Options
 file_path = "/home/sixten/Projects/GDS_saves/"

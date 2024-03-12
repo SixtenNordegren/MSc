@@ -5,15 +5,13 @@ from func import print_Fridrik_understands
 from loss_functions.d7 import *
 from gds.optimizers import *
 
-theory = d7()
-processor = Adam()
-
-
-f_opt = theory.loss_func
 x0 = tf.random.uniform((75,), dtype=tf.float32)
 tol = 1e-4
 ttol = 1e-9
 
+theory = d7()
+f_opt = theory.loss_func
+processor = Adam(ttol, f_opt, theory.inputs)
 
 save_location = "/home/sixten/Projects/GDS_saves/"
 file_name = "test_2024-03-01_2"
@@ -58,11 +56,12 @@ def masses_computation(sol):
 
 
 if __name__ == "__main__":
-    number_of_solutions = 100
+    number_of_solutions = 1
     solutions = []
     for _ in range(number_of_solutions):
         x0 = tf.random.uniform((75,), dtype=tf.float32)
         sol = scanner(x0)
+        sol = processor.search(sol)
 
         solutions.append(sol.numpy())
         print_str = print_Fridrik_understands(
