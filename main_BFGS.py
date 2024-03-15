@@ -17,6 +17,20 @@ save_location = "/home/sixten/Projects/GDS_saves/"
 file_name = "test_2024-03-01_2"
 
 
+def search(input_point, maxiter=1e4):
+    input_point = tf.Variable(input_point, dtype=tf.float64)
+
+    iter = 0
+    while True:
+        gradients = processor.minimizer(input_point)
+        tf.print(tf.linalg.norm(gradients))
+        if tf.linalg.norm(gradients) < tol:
+            yield input_point
+        elif iter > maxiter:
+            print("Ran out of range; will stop.")
+            iter += 1
+
+
 def auto_grad(bar):
     bar = tf.constant(bar)
     with tf.GradientTape() as tape:
@@ -61,7 +75,8 @@ if __name__ == "__main__":
     for _ in range(number_of_solutions):
         x0 = tf.random.uniform((75,), dtype=tf.float32)
         sol = scanner(x0)
-        sol = processor.search(sol)
+        precision_scanner = search(sol)
+        sol = next(precision_scanner)
 
         solutions.append(sol.numpy())
         print_str = print_Fridrik_understands(

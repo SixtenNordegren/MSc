@@ -53,7 +53,7 @@ class d7:
     def __init__(self):
         pass
 
-    @tf.function
+    # @tf.function
     def Y(self, y):
         values = [
             y[0],
