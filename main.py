@@ -1,7 +1,6 @@
 import numpy as np
-import tensorflow as tf
-from gds.optimizers import *
-from loss_functions.d7 import *
+import gds.optimizers
+import loss_functions.d7
 from datetime import datetime
 
 
@@ -11,7 +10,7 @@ file_name = "Quadratic_constraint"
 search_length = 3  # Number of minimas to look for
 
 # Search paramters
-tol = 1e-9
+tol = 1e-4
 initial_learning_rate = 1e-2
 decay_steps = 1250
 decay_rate = 0.5
@@ -19,17 +18,17 @@ decay_rate = 0.5
 # Operationl paramters
 good_minima = False
 max_steps = 10000
-theory = d7()
+theory = loss_functions.d7.d7()
 # processor = Adam(initial_learning_rate, theory.loss_func, *theory.inputs())
-processor = GD_op(
+processor = gds.optimizers.GD_op(
     initial_learning_rate,
     theory.loss_func,
     *theory.inputs(),
     decay_steps=decay_steps,
     decay_rate=decay_rate,
 )
-# processor = GD(initial_learning_rate, theory.loss_func, *theory.inputs())
-processor = BFGS(initial_learning_rate, theory.loss_func, *theory.inputs())
+# processor = gds.GD(initial_learning_rate, theory.loss_func, *theory.inputs())
+# processor = BFGS(initial_learning_rate, theory.loss_func, *theory.inputs())
 
 step = None
 norm = None
@@ -48,7 +47,7 @@ for _ in range(search_length):
                 print("######################################")
                 minima.append((step, *processor.optimizer.variables()))
                 break
-        if step % 1 == 0:
+        if step % 100 == 0:
             norm = processor.norm(gradients)
             print(f"Steps: {step}")
             print(f"Total norm:{norm}")

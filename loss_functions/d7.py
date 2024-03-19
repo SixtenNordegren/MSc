@@ -329,16 +329,6 @@ class d7:
         output = tf.cast(tf.sparse.to_dense(output), dtype=tf.float32)
         return output
 
-    # @tf.function
-    # def X(self, y, z):
-    #     dim = 5
-    #     delta = tf.eye(dim, dtype=tf.float32)
-    #     x = 1 / 2 * (
-    #         tf.einsum("QM,NP->QMNP", delta, self.Y(y))
-    #         - tf.einsum("QN,MP->QMNP", delta, self.Y(y))
-    #     ) - 2 * tf.einsum("MNPRS,RSQ->MNPQ", LC, self.Z(z))
-    #     return x
-
     @tf.function
     def QC(self, y, z):
         """
@@ -405,7 +395,6 @@ class d7:
         )
         return grad_V
 
-    # @tf.function
     def V(self, y, z):
         """
         TensorFlow version of the potential V function.

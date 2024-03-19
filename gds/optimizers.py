@@ -83,14 +83,26 @@ class Adam:
         return tf.linalg.norm(tf.concat(list(*gradients), axis=0))
 
     @tf.function
-    def minimizer(self, inputs):
-        tf.print("Opened minimizer")
-        with tf.GradientTape(persistent=False) as tape:
-            loss = self.loss_wrapper(inputs)
-        gradients = tape.gradient(loss, list(inputs))
-        self.optimizer.apply_gradients(zip(loss, list(list(inputs))))
+    def minimizer(self):
+        with tf.GradientTape() as tape:
+            loss = self.loss_wrapper(self.inputs)
+        gradients = tape.gradient(loss, list(self.inputs))
+        self.optimizer.apply_gradients(zip(loss, list(list(self.inputs))))
         print(gradients)
         return gradients
+
+    def search(self, input_point, maxiter=1e4):
+        self.inputs = tf.Variable(input_point, dtype=tf.float64)
+
+        iter = 0
+        while True:
+            gradients = self.minimizer()
+            tf.print(self.norm(gradients))
+            if self.norm(gradients) < self.tol:
+                yield self.input_point
+            elif iter > maxiter:
+                print("Ran out of range; will stop.")
+            iter += 1
 
 
 class BFGS:

@@ -1,25 +1,25 @@
 import tensorflow as tf
-import numpy
+import numpy as np
 import scipy.optimize
 from func import print_Fridrik_understands
-from loss_functions.d7 import *
-from gds.optimizers import *
+import loss_functions.d7
+import gds.optimizers
 
 x0 = tf.random.uniform((75,), dtype=tf.float32)
 tol = 1e-4
 ttol = 1e-9
 
-theory = d7()
+theory = loss_functions.d7.d7()
 f_opt = theory.loss_func
-processor = Adam(ttol, f_opt, theory.inputs)
+processor = gds.optimizers.Adam(ttol, f_opt, theory.inputs)
+
+t = loss_functions.d7.generators()
 
 save_location = "/home/sixten/Projects/GDS_saves/"
 file_name = "test_2024-03-01_2"
 
 
-def search(input_point, maxiter=1e4):
-    input_point = tf.Variable(input_point, dtype=tf.float64)
-
+def search(maxiter=1e4):
     iter = 0
     while True:
         gradients = processor.minimizer(input_point)
@@ -31,8 +31,16 @@ def search(input_point, maxiter=1e4):
             iter += 1
 
 
+# There is a peculiar interaction with tensorflow and the numpy
+# interface where the tensorflow interface requires the Variable to be
+# kept outside the scope of the function, for reasons contained in the
+# structure of the scipy implementation of the BFGS function, it
+# demands the passing of the variable being minimized within the scope
+# of the function. This means that we have to define two different
+# minimization functions. One for scipy and one for tensorflow.
+
+
 def auto_grad(bar):
-    bar = tf.constant(bar)
     with tf.GradientTape() as tape:
         tape.watch(bar)
         loss_func = loss_wrapper(bar)
@@ -47,7 +55,7 @@ def loss_wrapper(bar):
 def scanner(x0):
     opt = scipy.optimize.fmin_bfgs(
         loss_wrapper,
-        x0.numpy(),
+        x0,
         fprime=auto_grad,
         gtol=tol,
         maxiter=10 ** 4,
@@ -74,8 +82,13 @@ if __name__ == "__main__":
     solutions = []
     for _ in range(number_of_solutions):
         x0 = tf.random.uniform((75,), dtype=tf.float32)
-        sol = scanner(x0)
-        precision_scanner = search(sol)
+        input_point = tf.Variable(scanner(x0))
+
+        print_str = print_Fridrik_understands(
+            masses_computation(sol), theory.V(sol[:25], sol[25:]), 1, 1
+        )
+        tf.print(print_str)
+        precision_scanner = search()
         sol = next(precision_scanner)
 
         solutions.append(sol.numpy())

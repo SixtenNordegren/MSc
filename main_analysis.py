@@ -2,10 +2,10 @@ import numpy
 import math
 import tensorflow as tf
 from func import print_Fridrik_understands
-from loss_functions.d7 import d7
+from loss_functions.d7 import d8
 
 data = numpy.load("/home/sixten/Projects/GDS_saves/test_2024-03-01_2.npz")
-theory = d7()
+theory = d8()
 
 
 # Iterate through each item in the loaded data and print
