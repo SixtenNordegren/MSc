@@ -6,29 +6,18 @@ import loss_functions.d7
 import gds.optimizers
 
 x0 = tf.random.uniform((75,), dtype=tf.float32)
+maxiter = int(1e4)
 tol = 1e-4
 ttol = 1e-9
+learning_rate = 1e-4
 
 theory = loss_functions.d7.d7()
 f_opt = theory.loss_func
-processor = gds.optimizers.Adam(ttol, f_opt, theory.inputs)
 
 t = loss_functions.d7.generators()
 
 save_location = "/home/sixten/Projects/GDS_saves/"
 file_name = "test_2024-03-01_2"
-
-
-def search(maxiter=1e4):
-    iter = 0
-    while True:
-        gradients = processor.minimizer(input_point)
-        tf.print(tf.linalg.norm(gradients))
-        if tf.linalg.norm(gradients) < tol:
-            yield input_point
-        elif iter > maxiter:
-            print("Ran out of range; will stop.")
-            iter += 1
 
 
 # There is a peculiar interaction with tensorflow and the numpy
@@ -38,9 +27,8 @@ def search(maxiter=1e4):
 # demands the passing of the variable being minimized within the scope
 # of the function. This means that we have to define two different
 # minimization functions. One for scipy and one for tensorflow.
-
-
 def auto_grad(bar):
+    bar = tf.constant(bar)
     with tf.GradientTape() as tape:
         tape.watch(bar)
         loss_func = loss_wrapper(bar)
@@ -64,6 +52,18 @@ def scanner(x0):
     return tf.constant(opt)
 
 
+def search(maxiter=1e4):
+    iter = 0
+    while True:
+        gradients = processor.minimizer()
+        tf.print(processor.norm(gradients))
+        if processor.norm(gradients) < processor.tol:
+            yield processor.input_point
+        elif iter >= maxiter:
+            print("Ran out of range; will stop.")
+        iter += 1
+
+
 def masses_computation(sol):
     inv_killing = tf.linalg.inv(tf.einsum("iAB,jBA->ij", t, t))
     masses = -15.0 * (
@@ -85,15 +85,30 @@ if __name__ == "__main__":
         input_point = tf.Variable(scanner(x0))
 
         print_str = print_Fridrik_understands(
-            masses_computation(sol), theory.V(sol[:25], sol[25:]), 1, 1
+            masses_computation(input_point),
+            1,
+            theory.V(input_point[:25], input_point[25:]),
+            1,
         )
         tf.print(print_str)
-        precision_scanner = search()
-        sol = next(precision_scanner)
+        processor = gds.optimizers.GD_op(
+            learning_rate, f_opt, input_point, theory.inputs
+        )
+        for step in range(maxiter):
+            grads = processor.gds()
+            if step % 5 == 0:
+                print("Printing grads!", processor.norm(grads))
+                print("Step: ", step)
+            if processor.norm(grads) < ttol:
+                print("Minima found!")
+                break
 
-        solutions.append(sol.numpy())
+        solutions.append(input_point.numpy())
         print_str = print_Fridrik_understands(
-            masses_computation(sol), theory.V(sol[:25], sol[25:]), 1, 1
+            masses_computation(input_point),
+            processor.norm(grads),
+            theory.V(input_point[:25], input_point[25:]),
+            1,
         )
         tf.print(print_str)
     np.savez(

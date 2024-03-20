@@ -8,30 +8,37 @@ class GD_op:
         self,
         learning_rate,
         loss_func,
+        input_point,
         *inputs,
         decay_steps=1000,
         decay_rate=0.5,
         squash_func=tf.asinh
     ):
 
-        # self.step_decay_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
-        #     [10, 30, 500, 750],
-        #     [1.0, 1e-1, 1e-2, 2e-3, 1.9e-3],
-        #     # [1.0, 1e-1, 1e-2, 4e-3, 2e-3, 8e-4],
-        # )
-        self.step_decay_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
-            learning_rate,
-            decay_steps,
-            decay_rate,
+        self.step_decay_schedule = tf.keras.optimizers.schedules.PiecewiseConstantDecay(
+            [750, 2999],
+            [5e-2, 1e-2, 5e-3],
+            # [1.0, 1e-1, 1e-2, 4e-3, 2e-3, 8e-4],
         )
+        # self.step_decay_schedule = tf.keras.optimizers.schedules.ExponentialDecay(
+        #     learning_rate,
+        #     decay_steps,
+        #     decay_rate,
+        # )
         self.optimizer = tf.keras.optimizers.SGD(
             learning_rate=self.step_decay_schedule, clipnorm=1.0
         )
         self.input_dims = inputs
-        self.inputs = [
-            tf.Variable(tf.random.uniform((dim,)), dtype=tf.float32) for dim in inputs
-        ]
+        # self.inputs = [
+        #     tf.Variable(tf.random.uniform((dim,)), dtype=tf.float32) for dim in inputs
+        # ]
+        self.inputs = [input_point]
         self.loss_func = tf.function(loss_func)
+
+    @tf.function
+    def loss_wrapper(self, bar):
+        # bar = bar[0]
+        return self.loss_func(bar[:25], bar[25:])
 
     def reset(self):
         self.step_decay_schedule.step = 0
@@ -57,26 +64,27 @@ class GD_op:
         """
         with tf.GradientTape() as tape:
             tape.watch(list(self.inputs))
-            loss = self.loss_func(*self.inputs)
+            loss = self.loss_wrapper(*self.inputs)
         gradients = tape.gradient(loss, list(self.inputs))
         self.optimizer.apply_gradients(zip(gradients, list(self.inputs)))
         return gradients
 
     @tf.function
     def norm(self, gradients):
-        norm = tf.linalg.norm(tf.concat([*gradients], axis=0))
-        return norm
+        return tf.linalg.norm(tf.concat([*gradients], axis=0))
 
 
 class Adam:
-    def __init__(self, learning_rate, loss_func, input_dims, tol=1e-9):
-        self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
-        self.input_dims = input_dims
-        self.tol = tol
+    def __init__(self, learning_rate, loss_func, input_point, input_dims, tol=1e-9):
         self.loss_func = loss_func
+        self.inputs = [input_point]
+        self.input_dims = input_dims
+        self.optimizer = tf.optimizers.Adam(learning_rate=learning_rate)
+        self.tol = tol
 
     @tf.function
     def loss_wrapper(self, bar):
+        # bar = bar[0]
         return self.loss_func(bar[:25], bar[25:])
 
     def norm(self, gradients):
@@ -85,22 +93,30 @@ class Adam:
     @tf.function
     def minimizer(self):
         with tf.GradientTape() as tape:
-            loss = self.loss_wrapper(self.inputs)
-        gradients = tape.gradient(loss, list(self.inputs))
-        self.optimizer.apply_gradients(zip(loss, list(list(self.inputs))))
-        print(gradients)
+            tape.watch(list(self.inputs))
+            loss = self.loss_wrapper(*self.inputs)
+            tf.print(loss)
+        gradients = tape.gradient(loss, list(self.inputs))[0]
+        tf.print(gradients)
+        self.optimizer.apply_gradients(zip(gradients, list(self.inputs)))
+        tf.print(gradients)
         return gradients
 
-    def search(self, input_point, maxiter=1e4):
-        self.inputs = tf.Variable(input_point, dtype=tf.float64)
+        # with tf.GradientTape() as tape:
+        #     tape.watch(list(self.inputs))
+        #     loss = self.loss_func(*self.inputs)
+        # gradients = tape.gradient(loss, list(self.inputs))
+        # self.optimizer.apply_gradients(zip(gradients, list(self.inputs)))
+        # return gradients
 
+    def search(self, maxiter=1e4):
         iter = 0
         while True:
             gradients = self.minimizer()
             tf.print(self.norm(gradients))
             if self.norm(gradients) < self.tol:
                 yield self.input_point
-            elif iter > maxiter:
+            elif iter >= maxiter:
                 print("Ran out of range; will stop.")
             iter += 1
 
